@@ -12,7 +12,7 @@
             </option>
         </datalist><label>Телефон рабочий:</label>
         <span v-if="errors.phone" class="error-message">{{ errors.phone }}</span>
-        <MaskInput v-model="phone" :mask="phoneMask" :placeholder="phonePlaceholder" @keydown.esc="clearPhone"
+        <MaskInput v-model="phone" mask="phoneMask.toString()" :placeholder="phonePlaceholder" @keydown.esc="clearPhone"
             :class="{ 'invalid': errors.phone }" />
         <label>Телефон сотовый:</label>
         <MaskInput v-model="phonecell" mask="+375(##) ###-##-##"
