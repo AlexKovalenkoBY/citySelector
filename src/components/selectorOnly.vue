@@ -14,12 +14,23 @@
 
         <label>Телефон рабочий MaskInput:</label>
         <span v-if="errors.phone" class="error-message">{{ errors.phone }}</span>
-        <MaskInput v-model="phone" :mask="phonemask" :placeholder="phonePlaceholder" v-clearonesc
-        :class="{ 'invalid': errors.phone }"  :key="phonemask"/>
-        <label>2Телефон рабочий input:</label>
+        <MaskInput 
+    v-model="phone"
+    :mask="phonemask"
+    :placeholder="phonePlaceholder"
+    v-clearonesc
+    :class="{ 'invalid': errors.phone }"
+    :key="phonemask"
+    @focus="addInitialSpace"
+    @blur="trimInput"
+    @input="ensureFirstSpace"
+/>
+
+
+        <!-- <label>2Телефон рабочий input:</label>
         <input v-model="phone" :mask="phonemask" :placeholder="phonePlaceholder" @keydown.esc="clearPhone"
-            :class="{ 'invalid': errors.phone }"  :key="phonemask"/>
-          
+            :class="{ 'invalid': errors.phone }"  :key="phonemask"/> -->
+
         <label>Телефон сотовый:</label>
         <MaskInput v-model="phonecell" mask="+375(##) ###-##-##" placeholder="+375 (__) ___-__-__" v-clearonesc
             title="Вводить только цифры" @keydown.esc="clearPhoneCell" />
@@ -27,10 +38,10 @@
 </template>
 
 <script>
-import { ref, onMounted, watch,computed  } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { debounce } from 'lodash-es';
-// import { MaskInput } from 'vue-mask-next';
-import { MaskInput } from 'vue-3-mask';
+import { MaskInput } from 'vue-mask-next';
+// import { MaskInput } from 'vue-3-mask';
 import Papa from 'papaparse';
 
 export default {
@@ -43,6 +54,22 @@ export default {
         const region = ref('');
         const city = ref('');
 
+
+        const addInitialSpace = () => {
+    if (!phone.value.trim()) {
+        phone.value = " "; // 👈 Принудительно вставляем пробел
+    }
+};
+
+const trimInput = () => {
+    phone.value = phone.value.trim(); // 👈 Убираем пробел после потери фокуса
+};
+
+const ensureFirstSpace = () => {
+    if (!phone.value.startsWith(" ")) {
+        phone.value = " " + phone.value; // 👈 Всегда гарантируем наличие пробела
+    }
+};
         const errors = ref({
             citySearch: '',
             phone: ''
@@ -53,7 +80,7 @@ export default {
         const citySearch = ref('');
         const filteredCities = ref([]);
         const phonePlaceholder = ref('Выберите город для отображения маски');
-       
+
         const selectCity = (cityItem) => {
             if (!cityItem) return;
 
@@ -206,9 +233,10 @@ export default {
         onMounted(async () => {
             await loadCSVData();
         });
-        const computedMask = computed(() => { 
+        const computedMask = computed(() => {
             console.log(phonemask.value);
-            return phonemask.value});
+            return phonemask.value
+        });
         return {
             data,
             phone,
@@ -228,23 +256,26 @@ export default {
         };
     },
 
-directives: {
-   clearonesc: {
-      mounted(el) {
-         el.addEventListener('keydown', async function (event) {
-            if (event.key === 'Escape') {
-               el.value = "";
-               el.dispatchEvent(new Event('input'));
+    directives: {
+        clearonesc: {
+            mounted(el) {
+                el.addEventListener('keydown', async function (event) {
+                    if (event.key === 'Escape') {
+                        el.value = "";
+                        el.dispatchEvent(new Event('input'));
+                    }
+                });
             }
-         });
-      }
-   }
-}
+        }
+    }
 };
 </script>
 
 <style scoped>
-label {width: 300px;}
+label {
+    width: 300px;
+}
+
 .error-message {
     color: red;
     font-size: 0.8em;
