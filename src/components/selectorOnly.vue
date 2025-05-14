@@ -10,21 +10,29 @@
                 ? `${cityItem.type} ${cityItem.name.replace(',', '')}`
                 : `${cityItem.type} ${cityItem.name}, ${cityItem.region}`" @click="selectCity(cityItem)">
             </option>
-        </datalist><label>Телефон рабочий:</label>
+        </datalist>
+
+        <label>Телефон рабочий MaskInput:</label>
         <span v-if="errors.phone" class="error-message">{{ errors.phone }}</span>
-        <MaskInput v-model="phone" mask="phoneMask.toString()" :placeholder="phonePlaceholder" @keydown.esc="clearPhone"
-            :class="{ 'invalid': errors.phone }" />
+        <MaskInput v-model="phone" :mask="phonemask" :placeholder="phonePlaceholder" v-clearonesc
+        :class="{ 'invalid': errors.phone }"  :key="phonemask"/>
+        <label>2Телефон рабочий input:</label>
+        <input v-model="phone" :mask="phonemask" :placeholder="phonePlaceholder" @keydown.esc="clearPhone"
+            :class="{ 'invalid': errors.phone }"  :key="phonemask"/>
+          
         <label>Телефон сотовый:</label>
-        <MaskInput v-model="phonecell" mask="+375(##) ###-##-##"
-            placeholder="+375 (..) Вводите только код оператора и номер" v-clearonesc title="Вводить только цифры "
-            @keydown.esc="clearPhoneCell" @input="checkMobilePhoneInput" />
+        <MaskInput v-model="phonecell" mask="+375(##) ###-##-##" placeholder="+375 (__) ___-__-__" v-clearonesc
+            title="Вводить только цифры" @keydown.esc="clearPhoneCell" />
     </div>
 </template>
+
 <script>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch,computed  } from 'vue'
 import { debounce } from 'lodash-es';
-import { MaskInput } from 'vue-mask-next';
+// import { MaskInput } from 'vue-mask-next';
+import { MaskInput } from 'vue-3-mask';
 import Papa from 'papaparse';
+
 export default {
     components: { MaskInput },
     setup() {
@@ -34,48 +42,58 @@ export default {
         const address = ref("");
         const region = ref('');
         const city = ref('');
+
         const errors = ref({
             citySearch: '',
-            zipcode: '',
             phone: ''
         });
+
         const csvData = ref([]);
-        const phoneMask = ref('');
+        const phonemask = ref('');
         const citySearch = ref('');
         const filteredCities = ref([]);
-        const phonePlaceholder = ref('');
-        const cellphonePlaceholder = ref('+375 (__) ___-__-__');
+        const phonePlaceholder = ref('Выберите город для отображения маски');
+       
         const selectCity = (cityItem) => {
             if (!cityItem) return;
+
             city.value = cityItem.name;
             const isMinsk = cityItem.name.replace(',', '').trim() === 'Минск';
+
             citySearch.value = isMinsk
                 ? `${cityItem.type} ${cityItem.name.replace(',', '')}`
                 : `${cityItem.type} ${cityItem.name}, ${cityItem.region}`;
+
             region.value = isMinsk ? '' : cityItem.region;
+
             if (cityItem.phonemask) {
-                phoneMask.value = cityItem.phonemask;
-                const expectedDigits = phoneMask.value.match(/#/g)?.length || 0;
-                phonePlaceholder.value = phoneMask.value ? `${phoneMask.value.replace(/#/g, '_')} (введите ${expectedDigits} цифр)` : '';
+                phonemask.value = cityItem.phonemask;
+                // Подсчёт только цифр номера (без кода города)
+                const numberPart = phonemask.value.split(')')[1] || '';
+                const numberDigits = numberPart.match(/#/g)?.length || 0;
+                phonePlaceholder.value = `${phonemask.value.replace(/#/g, '_')} (введите ${numberDigits} цифр)`;
             } else {
-                phoneMask.value = '';
-                phonePlaceholder.value = '';
+                phonemask.value = '';
+                phonePlaceholder.value = 'Маска для этого города не определена';
             }
+
             phone.value = '';
             phonecell.value = '';
-
         };
+
         const handleCitySearch = () => {
             if (!citySearch.value) {
                 filteredCities.value = [];
                 phone.value = '';
                 return;
             }
+
             if (!csvData.value || csvData.value.length === 0) {
                 console.error('Данные городов не загружены');
                 filteredCities.value = [];
                 return;
             }
+
             const searchTerm = citySearch.value.toLowerCase();
             filteredCities.value = csvData.value
                 .filter(item => {
@@ -95,29 +113,48 @@ export default {
                 })
                 .slice(0, 20);
         };
+
         const clearPhone = () => {
             phone.value = '';
-
         };
+
         const clearPhoneCell = () => {
             phonecell.value = '';
-
         };
+
+        const validatePhone = () => {
+            if (!phonemask.value) return;
+
+            const numberPart = phonemask.value.split(')')[1] || '';
+            const expectedDigits = numberPart.match(/#/g)?.length || 0;
+            const enteredDigits = phone.value.replace(/\D/g, '').length;
+
+
+
+            errors.value.phone = '';
+            return true;
+        };
+
+        watch(phone, () => {
+            validatePhone();
+        });
+
         watch(citySearch, debounce((newVal) => {
             if (!newVal || !csvData.value.length) {
                 city.value = '';
                 region.value = '';
-                phonePlaceholder.value = phoneMask.value.replace(/#/g, '_');
+                phonemask.value = '';
+                phonePlaceholder.value = 'Выберите город для отображения маски';
                 phone.value = '';
                 phonecell.value = '';
                 return;
             }
+
             const match = csvData.value.find(item => {
                 const isMinsk = item.name.replace(',', '').trim() === 'Минск';
                 const itemValue = isMinsk
                     ? `${item.type} ${item.name.replace(',', '')}`
                     : `${item.type} ${item.name}, ${item.region}`;
-
                 return itemValue === newVal;
             });
 
@@ -125,12 +162,14 @@ export default {
                 selectCity(match);
             }
         }, 100));
+
         const loadCSVData = async () => {
             try {
                 const response = await fetch('/cities.csv');
                 if (!response.ok) throw new Error(`HTTP ошибка! статус: ${response.status}`);
                 const csvText = await response.text();
                 if (!csvText) throw new Error("CSV-файл пуст");
+
                 Papa.parse(csvText, {
                     header: true,
                     complete: (results) => {
@@ -142,11 +181,14 @@ export default {
                             if (!item.phonemask && item.phonecode) {
                                 const code = item.phonecode.replace('+375', '').trim();
                                 if (code.length === 2) {
+                                    // Для 2-значных кодов: 7 цифр номера (###-##-##)
                                     item.phonemask = `+375 (${code}) ###-##-##`;
                                 } else if (code.length === 3) {
+                                    // Для 3-значных кодов: 6 цифр номера (##-##-##)
                                     item.phonemask = `+375 (${code}) ##-##-##`;
                                 } else if (code.length === 4) {
-                                    item.phonemask = `+375 (${code}) #-##-##`;
+                                    // Для 4-значных кодов: 5 цифр подряд без разделителей
+                                    item.phonemask = `+375 (${code}) #####`;
                                 }
                             }
                             return item;
@@ -160,25 +202,56 @@ export default {
                 console.error('Ошибка загрузки CSV:', error);
             }
         };
+
         onMounted(async () => {
             await loadCSVData();
         });
-return {
-            clearPhone,
-            clearPhoneCell, data,
+        const computedMask = computed(() => { 
+            console.log(phonemask.value);
+            return phonemask.value});
+        return {
+            data,
             phone,
             phonecell,
             address,
             region,
             city,
-            phoneMask,
+            phonemask,
             phonePlaceholder,
             citySearch,
             filteredCities,
-            handleCitySearch,
             errors,
+            clearPhone,
+            clearPhoneCell,
+            handleCitySearch,
             selectCity
         };
-    }
+    },
+
+directives: {
+   clearonesc: {
+      mounted(el) {
+         el.addEventListener('keydown', async function (event) {
+            if (event.key === 'Escape') {
+               el.value = "";
+               el.dispatchEvent(new Event('input'));
+            }
+         });
+      }
+   }
+}
 };
 </script>
+
+<style scoped>
+label {width: 300px;}
+.error-message {
+    color: red;
+    font-size: 0.8em;
+    margin-left: 5px;
+}
+
+.invalid {
+    border-color: red;
+}
+</style>
